@@ -1,98 +1,122 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Alert } from 'react-native';
+import Loader from '../../components/loader/loader';
+import Weather from '../../components/weather/weather';
+import * as Location from 'expo-location';
+import axios from 'axios';
 
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Link } from 'expo-router';
+interface WeatherData {
+  coord: {
+    lat: number;
+    lon: number;
+  };
+  weather: {
+    id: number;
+    main: string;
+    description: string;
+    icon: string;
+  }[];
+  main: {
+    temp: number;
+    feels_like: number;
+    temp_min: number;
+    temp_max: number;
+    pressure: number;
+    humidity: number;
+  };
+  wind: {
+    speed: number;
+    deg: number;
+  };
+  name: string;
+}
+//https://api.openweathermap.org/data/2.5/weather?q=tashkent&appid=4931afcd6f42e6f6c6d042f7074d41a4&units=metric
+
+const API_KEY = "4931afcd6f42e6f6c6d042f7074d41a4"
 
 export default function HomeScreen() {
-  return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
-            />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
+  const [isLoading, setIsLoading] = useState(true)
+  const [location, setLocation] = useState<WeatherData | null>(null)
 
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+
+
+  const getWeather = async (latitude: number, longitude: number): Promise<void> => {
+    try {
+      const { data } = await axios.get<WeatherData>(
+        `https://api.openweathermap.org/data/2.5/weather?lat=${latitude}&lon=${longitude}&appid=${API_KEY}&units=metric`
+      );
+      // const { data } = await axios.get<WeatherData>(
+      //   `https://api.openweathermap.org/data/2.5/weather?q=egypt&lat=${latitude}&lon=${longitude}&appid=${API_KEY}&units=metric`
+      // );
+      setLocation(data);
+      setIsLoading(false);
+    } catch (error) {
+      console.log(error);
+      setIsLoading(false);
+    }
+  };
+
+  const setWeather = async (query: string, latitude: number, longitude: number) => {
+    try {
+      const { data } = await axios.get<WeatherData>(
+        `https://api.openweathermap.org/data/2.5/weather?q=${query}&lat=${latitude}&lon=${longitude}&appid=${API_KEY}&units=metric`
+      );
+      setLocation(data);
+      setIsLoading(false);
+    } catch (error) {
+      console.log(error);
+      setIsLoading(false);
+    }
+  }
+
+
+  const getLocation = async () => {
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert("Permission to access location was denied")
+        setIsLoading(false);
+        return;
+      }
+      let { coords: { latitude, longitude } } = await Location.getCurrentPositionAsync({});
+
+      getWeather(latitude, longitude)
+    } catch (error) {
+      Alert.alert("Error getting location")
+      setIsLoading(false);
+      console.log(error);
+    }
+  }
+
+  useEffect(() => {
+    getLocation()
+  }, [])
+
+  return (
+    isLoading ? <Loader /> : location && <Weather
+      temp={location.main.temp}
+      name={location.name}
+      condition={location.weather[0].main}
+      setWeather={setWeather}
+    />
   );
+
 }
 
-const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
-  },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
-  },
-});
+// const styles = StyleSheet.create({
+//   stepContainer: {
+//     flex: 1,
+//   },
+//   box1: {
+//     flex: 1,
+//     backgroundColor: "blue"
+//   },
+//   box2: {
+//     flex: 1,
+//     backgroundColor: "white"
+//   },
+//   box3: {
+//     flex: 1,
+//     backgroundColor: "green"
+//   }
+// });
